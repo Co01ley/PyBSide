@@ -3,7 +3,7 @@ import re
 variables = {}
 
 # -----------------------------
-# Error helpers
+# Error helper
 # -----------------------------
 def error(kind, message):
     print(f"{kind} Error: {message}")
@@ -71,8 +71,8 @@ def evaluate_value(expr):
     if expr in variables:
         return variables[expr]
 
-    # function call
-    m = re.match(r'^([a-zA-Z_]\w*)\((.*)\)$', expr)
+    # function call (supports dots: speech.input)
+    m = re.match(r'^([a-zA-Z_][\w\.]*)\((.*)\)$', expr)
     if m:
         fname = m.group(1)
         inside = m.group(2)
