@@ -124,47 +124,26 @@ def parse_arguments(arg_string):
 
 
 # -----------------------------
-# Execute a block of lines
-# -----------------------------
-def run_block(lines, start_index, indent_level):
-    i = start_index
-    while i < len(lines):
-        line = lines[i]
-        stripped = line.lstrip()
-        current_indent = len(line) - len(stripped)
-
-        if current_indent < indent_level:
-            return i - 1
-
-        if current_indent > indent_level:
-            error("Syntax", "Unexpected indentation")
-            return i
-
-        run_line(stripped)
-        i += 1
-
-    return i
-
-
-# -----------------------------
 # Execute a single line
 # -----------------------------
 def run_line(line):
     # IF
-    if line.startswith("if ") and " then:" in line:
-        condition = line[3:line.index(" then:")].strip()
-        result = evaluate_value(condition)
-        return ("IF", result)
+    if line.startswith("if ") and line.endswith(" then:"):
+        condition = line[3:-6].strip()
+        return ("IF", evaluate_value(condition))
 
     # ELSIF
-    if line.startswith("elsif ") and " then:" in line:
-        condition = line[6:line.index(" then:")].strip()
-        result = evaluate_value(condition)
-        return ("ELSIF", result)
+    if line.startswith("elsif ") and line.endswith(" then:"):
+        condition = line[6:-6].strip()
+        return ("ELSIF", evaluate_value(condition))
 
     # ELSE
     if line == "else:":
         return ("ELSE", True)
+
+    # END
+    if line == "end":
+        return ("END", None)
 
     # assignment
     if "=" in line and not line.startswith("speech."):
@@ -176,8 +155,7 @@ def run_line(line):
             error("Syntax", f"Invalid variable name '{var}'")
             return
 
-        value = evaluate_value(expr)
-        variables[var] = value
+        variables[var] = evaluate_value(expr)
         return
 
     # speech.print(...)
@@ -196,44 +174,45 @@ def run_line(line):
 
 
 # -----------------------------
-# Run file with block support
+# Run file with block logic
 # -----------------------------
 def run_file(path):
     with open(path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+        lines = [l.rstrip("\n") for l in f]
 
     i = 0
-    skip_until = None
-    active = False
+    stack = []  # each element: ("IF", active), ("ELSE", active), etc.
 
     while i < len(lines):
-        raw = lines[i]
-        stripped = raw.lstrip()
-        indent = len(raw) - len(stripped)
+        line = lines[i].strip()
+        result = run_line(line)
 
-        result = run_line(stripped)
-
-        # IF / ELSIF / ELSE handling
+        # IF / ELSIF / ELSE / END handling
         if isinstance(result, tuple):
             kind, cond = result
 
             if kind == "IF":
-                active = cond
-                skip_until = indent + 4
+                stack.append(cond)
 
             elif kind == "ELSIF":
-                if active:
-                    active = False
+                if stack[-1] is True:
+                    stack[-1] = False
                 else:
-                    active = cond
+                    stack[-1] = cond
 
             elif kind == "ELSE":
-                active = not active
+                stack[-1] = not stack[-1]
+
+            elif kind == "END":
+                stack.pop()
 
             i += 1
             continue
 
-        # normal line
+        # normal line: only run if all conditions are True
+        if all(stack) if stack else True:
+            run_line(line)
+
         i += 1
 
 
