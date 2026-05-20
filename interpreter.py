@@ -124,12 +124,47 @@ def parse_arguments(arg_string):
 
 
 # -----------------------------
+# Execute a block of lines
+# -----------------------------
+def run_block(lines, start_index, indent_level):
+    i = start_index
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.lstrip()
+        current_indent = len(line) - len(stripped)
+
+        if current_indent < indent_level:
+            return i - 1
+
+        if current_indent > indent_level:
+            error("Syntax", "Unexpected indentation")
+            return i
+
+        run_line(stripped)
+        i += 1
+
+    return i
+
+
+# -----------------------------
 # Execute a single line
 # -----------------------------
 def run_line(line):
-    line = line.strip()
-    if not line:
-        return
+    # IF
+    if line.startswith("if ") and " then:" in line:
+        condition = line[3:line.index(" then:")].strip()
+        result = evaluate_value(condition)
+        return ("IF", result)
+
+    # ELSIF
+    if line.startswith("elsif ") and " then:" in line:
+        condition = line[6:line.index(" then:")].strip()
+        result = evaluate_value(condition)
+        return ("ELSIF", result)
+
+    # ELSE
+    if line == "else:":
+        return ("ELSE", True)
 
     # assignment
     if "=" in line and not line.startswith("speech."):
@@ -161,12 +196,45 @@ def run_line(line):
 
 
 # -----------------------------
-# Run file
+# Run file with block support
 # -----------------------------
 def run_file(path):
     with open(path, "r", encoding="utf-8") as f:
-        for raw in f:
-            run_line(raw)
+        lines = f.readlines()
+
+    i = 0
+    skip_until = None
+    active = False
+
+    while i < len(lines):
+        raw = lines[i]
+        stripped = raw.lstrip()
+        indent = len(raw) - len(stripped)
+
+        result = run_line(stripped)
+
+        # IF / ELSIF / ELSE handling
+        if isinstance(result, tuple):
+            kind, cond = result
+
+            if kind == "IF":
+                active = cond
+                skip_until = indent + 4
+
+            elif kind == "ELSIF":
+                if active:
+                    active = False
+                else:
+                    active = cond
+
+            elif kind == "ELSE":
+                active = not active
+
+            i += 1
+            continue
+
+        # normal line
+        i += 1
 
 
 if __name__ == "__main__":
