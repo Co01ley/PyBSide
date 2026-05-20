@@ -2,31 +2,59 @@ import re
 
 variables = {}
 
-def evaluate_value(value):
-    value = value.strip()
+# -----------------------------
+# Convert word-based operators → symbols
+# -----------------------------
+def normalise_expression(expr):
+    expr = expr.lower()
+
+    expr = expr.replace(" plus ", " + ")
+    expr = expr.replace(" minus ", " - ")
+    expr = expr.replace(" times ", " * ")
+    expr = expr.replace(" multiplied by ", " * ")
+    expr = expr.replace(" divide ", " / ")
+    expr = expr.replace(" divided by ", " / ")
+
+    return expr
+
+
+# -----------------------------
+# Evaluate a value or expression
+# -----------------------------
+def evaluate_value(expr):
+    expr = expr.strip()
 
     # string literal
-    if value.startswith('"') and value.endswith('"'):
-        return value[1:-1]
+    if expr.startswith('"') and expr.endswith('"'):
+        return expr[1:-1]
 
     # variable
-    if value in variables:
-        return variables[value]
+    if expr in variables:
+        return variables[expr]
 
-    # fallback
-    return value
+    # normalise word operators
+    expr = normalise_expression(expr)
+
+    # try maths evaluation
+    try:
+        return eval(expr, {}, variables)
+    except:
+        return expr
 
 
+# -----------------------------
+# Parse arguments inside speech.print(...)
+# -----------------------------
 def parse_arguments(arg_string):
-    # split by commas not inside quotes
     parts = re.findall(r'"[^"]*"|[^,]+', arg_string)
     return [evaluate_value(p.strip()) for p in parts]
 
 
+# -----------------------------
+# Execute a single line
+# -----------------------------
 def run_line(line):
     line = line.strip()
-
-    # empty line
     if not line:
         return
 
@@ -37,11 +65,10 @@ def run_line(line):
         expr = expr.strip()
 
         # speech.input()
-        if expr.startswith("speech.input()"):
+        if expr == "speech.input()":
             variables[var] = input("> ")
             return
 
-        # string or variable assignment
         variables[var] = evaluate_value(expr)
         return
 
