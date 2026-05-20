@@ -10,3 +10,10 @@ n = speech.input()
 n_int = int(n)
 double = n_int * 2
 speech.print("Double:", double)
+
+if x > 5 then:
+    speech.print("Big")
+elsif x == 5 then:
+    speech.print("Equal")
+else:
+    speech.print("Small")
