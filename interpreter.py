@@ -63,19 +63,15 @@ def split_args(s):
 def evaluate_value(expr):
     expr = expr.strip()
 
-    # blank
     if expr == "":
         return None
 
-    # string literal
     if expr.startswith('"') and expr.endswith('"'):
         return expr[1:-1]
 
-    # variable
     if expr in variables:
         return variables[expr]
 
-    # function call (supports dots: speech.input)
     m = re.match(r'^([a-zA-Z_][\w\.]*)\((.*)\)$', expr)
     if m:
         fname = m.group(1)
@@ -102,10 +98,8 @@ def evaluate_value(expr):
         error("Function", f"Unknown function '{fname}'")
         return None
 
-    # normalise word operators
     expr_norm = normalise_expression(expr)
 
-    # try maths
     try:
         return eval(expr_norm, {}, variables)
     except NameError:
@@ -130,38 +124,30 @@ def parse_arguments(arg_string):
 # Parse a single line (no execution)
 # -----------------------------
 def parse_line(line):
-    if line.strip() == "":
+    line = line.strip()   # ⭐ FIX: strip indentation here
+
+    if line == "":
         return ("EMPTY", None)
 
-    # IF
     if line.startswith("if ") and line.endswith(" then:"):
-        condition = line[3:-6].strip()
-        return ("IF", condition)
+        return ("IF", line[3:-6].strip())
 
-    # ELSIF
     if line.startswith("elsif ") and line.endswith(" then:"):
-        condition = line[6:-6].strip()
-        return ("ELSIF", condition)
+        return ("ELSIF", line[6:-6].strip())
 
-    # ELSE
     if line == "else:":
         return ("ELSE", None)
 
-    # END
     if line == "end":
         return ("END", None)
 
-    # assignment
     if "=" in line and not line.startswith("speech."):
         var, expr = line.split("=", 1)
         return ("ASSIGN", (var.strip(), expr.strip()))
 
-    # print
     if line.startswith("speech.print(") and line.endswith(")"):
-        inside = line[len("speech.print("):-1]
-        return ("PRINT", inside)
+        return ("PRINT", line[len("speech.print("):-1])
 
-    # input
     if re.match(r'^speech\.input\(\s*\)$', line):
         return ("INPUT", None)
 
@@ -176,23 +162,17 @@ def run_file(path):
         lines = [l.rstrip("\n") for l in f]
 
     i = 0
-    stack = []  # True/False for each IF block
+    stack = []
 
     while i < len(lines):
-        raw = lines[i]
-        parsed_type, data = parse_line(raw)
+        parsed_type, data = parse_line(lines[i])
 
-        # skip empty lines
         if parsed_type == "EMPTY":
             i += 1
             continue
 
-        # -------------------------
-        # IF / ELSIF / ELSE / END
-        # -------------------------
         if parsed_type == "IF":
-            cond = evaluate_value(data)
-            stack.append(bool(cond))
+            stack.append(bool(evaluate_value(data)))
             i += 1
             continue
 
@@ -214,9 +194,6 @@ def run_file(path):
             i += 1
             continue
 
-        # -------------------------
-        # Normal line execution
-        # -------------------------
         should_run = all(stack) if stack else True
 
         if should_run:
@@ -225,8 +202,7 @@ def run_file(path):
                 variables[var] = evaluate_value(expr)
 
             elif parsed_type == "PRINT":
-                args = parse_arguments(data)
-                print(*args)
+                print(*parse_arguments(data))
 
             elif parsed_type == "INPUT":
                 input("> ")
