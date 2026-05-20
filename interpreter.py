@@ -63,6 +63,10 @@ def split_args(s):
 def evaluate_value(expr):
     expr = expr.strip()
 
+    # blank
+    if expr == "":
+        return None
+
     # string literal
     if expr.startswith('"') and expr.endswith('"'):
         return expr[1:-1]
@@ -80,7 +84,6 @@ def evaluate_value(expr):
         args = split_args(inside)
         eval_args = [evaluate_value(a) for a in args]
 
-        # built-in conversions
         try:
             if fname == "int":
                 return int(float(eval_args[0]))
@@ -124,22 +127,25 @@ def parse_arguments(arg_string):
 
 
 # -----------------------------
-# Execute a single line
+# Parse a single line (no execution)
 # -----------------------------
-def run_line(line):
+def parse_line(line):
+    if line.strip() == "":
+        return ("EMPTY", None)
+
     # IF
     if line.startswith("if ") and line.endswith(" then:"):
         condition = line[3:-6].strip()
-        return ("IF", evaluate_value(condition))
+        return ("IF", condition)
 
     # ELSIF
     if line.startswith("elsif ") and line.endswith(" then:"):
         condition = line[6:-6].strip()
-        return ("ELSIF", evaluate_value(condition))
+        return ("ELSIF", condition)
 
     # ELSE
     if line == "else:":
-        return ("ELSE", True)
+        return ("ELSE", None)
 
     # END
     if line == "end":
@@ -148,29 +154,18 @@ def run_line(line):
     # assignment
     if "=" in line and not line.startswith("speech."):
         var, expr = line.split("=", 1)
-        var = var.strip()
-        expr = expr.strip()
+        return ("ASSIGN", (var.strip(), expr.strip()))
 
-        if not re.match(r'^[a-zA-Z_]\w*$', var):
-            error("Syntax", f"Invalid variable name '{var}'")
-            return
-
-        variables[var] = evaluate_value(expr)
-        return
-
-    # speech.print(...)
+    # print
     if line.startswith("speech.print(") and line.endswith(")"):
         inside = line[len("speech.print("):-1]
-        args = parse_arguments(inside)
-        print(*args)
-        return
+        return ("PRINT", inside)
 
-    # speech.input() alone
+    # input
     if re.match(r'^speech\.input\(\s*\)$', line):
-        input("> ")
-        return
+        return ("INPUT", None)
 
-    error("Syntax", f"Unknown command '{line}'")
+    return ("UNKNOWN", line)
 
 
 # -----------------------------
@@ -181,41 +176,70 @@ def run_file(path):
         lines = [l.rstrip("\n") for l in f]
 
     i = 0
-    stack = []  # each element: ("IF", active), ("ELSE", active), etc.
+    stack = []  # True/False for each IF block
 
     while i < len(lines):
-        line = lines[i].strip()
-        result = run_line(line)
+        raw = lines[i]
+        parsed_type, data = parse_line(raw)
 
-        # IF / ELSIF / ELSE / END handling
-        if isinstance(result, tuple):
-            kind, cond = result
-
-            if kind == "IF":
-                stack.append(cond)
-
-            elif kind == "ELSIF":
-                if stack[-1] is True:
-                    stack[-1] = False
-                else:
-                    stack[-1] = cond
-
-            elif kind == "ELSE":
-                stack[-1] = not stack[-1]
-
-            elif kind == "END":
-                stack.pop()
-
+        # skip empty lines
+        if parsed_type == "EMPTY":
             i += 1
             continue
 
-        # normal line: only run if all conditions are True
-        if all(stack) if stack else True:
-            run_line(line)
+        # -------------------------
+        # IF / ELSIF / ELSE / END
+        # -------------------------
+        if parsed_type == "IF":
+            cond = evaluate_value(data)
+            stack.append(bool(cond))
+            i += 1
+            continue
+
+        if parsed_type == "ELSIF":
+            if stack[-1] is True:
+                stack[-1] = False
+            else:
+                stack[-1] = bool(evaluate_value(data))
+            i += 1
+            continue
+
+        if parsed_type == "ELSE":
+            stack[-1] = not stack[-1]
+            i += 1
+            continue
+
+        if parsed_type == "END":
+            stack.pop()
+            i += 1
+            continue
+
+        # -------------------------
+        # Normal line execution
+        # -------------------------
+        should_run = all(stack) if stack else True
+
+        if should_run:
+            if parsed_type == "ASSIGN":
+                var, expr = data
+                variables[var] = evaluate_value(expr)
+
+            elif parsed_type == "PRINT":
+                args = parse_arguments(data)
+                print(*args)
+
+            elif parsed_type == "INPUT":
+                input("> ")
+
+            elif parsed_type == "UNKNOWN":
+                error("Syntax", f"Unknown command '{data}'")
 
         i += 1
 
 
+# -----------------------------
+# Entry point
+# -----------------------------
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:
