@@ -1,3 +1,4 @@
 speech.print("What is your name?")
 name = speech.input()
 speech.print("Hello,", name)
+speech.print(5 subtract 3)
