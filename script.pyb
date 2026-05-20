@@ -11,6 +11,7 @@ n_int = int(n)
 double = n_int * 2
 speech.print("Double:", double)
 
+x = 4
 if x > 5 then:
     speech.print("Big")
 elsif x == 5 then:
