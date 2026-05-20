@@ -1,4 +1,12 @@
 speech.print("What is your name?")
 name = speech.input()
 speech.print("Hello,", name)
-speech.print(5 subtract 3)
+speech.print(5+3)
+speech.print(5 + 3)
+speech.print(5 plus 3)
+
+speech.print("Enter a number:")
+n = speech.input()
+n_int = int(n)
+double = n_int * 2
+speech.print("Double:", double)
